@@ -59,13 +59,38 @@ test('a NOT_MEASURED row does not pollute a quorum over the same task', () => {
 });
 
 test('a quorum never mixes claim kinds', () => {
+  // NO FILTER. The CLI calls `quorum(table)` with no filter, and the
+  // previous version of this test passed `{ claim: 'CERTIFIED' }` -- so it
+  // tested the CALLER'S FILTER, not the function's behaviour. The
+  // function, called the way the CLI calls it, put a CERTIFIED row and an
+  // ASSERTED row over the same task and denominator into ONE bucket,
+  // labelled "CERTIFIED+OBSERVED", with mixedClaimKinds:true and pass:2.
+  //
+  // The comment in src/score.mjs said "Mixing a CERTIFIED row with an
+  // ASSERTED one to reach a quorum is how a quorum is faked" -- and the
+  // function did exactly that, then reported the mix as a quorum.
   const t = buildTable([
     row({ id: 'c', claim: 'CERTIFIED' }),
     row({ id: 'a', claim: 'ASSERTED' }),
   ], PR);
-  const q = quorum(t, { claim: 'CERTIFIED' });
-  assert.equal(q.length, 1);
-  assert.equal(q[0].rows, 1);
+  const q = quorum(t);
+  assert.equal(q.length, 2, 'the two claim kinds must be SEPARATE buckets');
+  assert.deepEqual(q.map((x) => x.claim).sort(), ['ASSERTED', 'CERTIFIED']);
+  for (const b of q) {
+    assert.equal(b.rows, 1, 'no bucket may contain both kinds');
+    assert.equal(b.pass, 1, 'a mixed bucket would have reported pass:2');
+  }
+});
+
+test('a mixed task+denominator is SURFACED, not averaged', () => {
+  const t = buildTable([
+    row({ id: 'c', claim: 'CERTIFIED' }),
+    row({ id: 'o', claim: 'OBSERVED' }),
+  ], PR);
+  const q = quorum(t);
+  assert.ok(q.every((b) => b.mixedClaimKinds === true),
+    'the reader of the table must be told that this task mixes claim kinds');
+  assert.ok(q.some((b) => Array.isArray(b.mixedWith) && b.mixedWith.includes('OBSERVED')));
 });
 
 test('the render says how many were not measured', () => {
