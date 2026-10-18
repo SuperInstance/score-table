@@ -54,18 +54,45 @@ export function buildTable(rows, prs = {}) {
 export function quorum(table, { claim } = {}) {
   const usable = table.filter((r) => r._valid && !r._underpowered && (!claim || r.claim === claim));
   const buckets = new Map();
+  // THE CLAIM KIND IS PART OF THE KEY. It was not, and the CLI calls
+  // `quorum(table)` with no filter -- so a CERTIFIED row and an OBSERVED
+  // row over the same task and denominator landed in ONE bucket, labelled
+  // "CERTIFIED+OBSERVED", with mixedClaimKinds:true and pass:2.
+  //
+  // The flag was computed and never acted on. The comment above this
+  // function said "Mixing a CERTIFIED row with an ASSERTED one to reach
+  // a quorum is how a quorum is faked" -- and the function did exactly
+  // that, and then reported the mix as a quorum.
+  //
+  // The audit that found this also found that the TEST that claimed to
+  // cover it passed a `claim` FILTER, so it tested the caller's filter
+  // rather than the function's behaviour. Six of six green while the
+  // function faked a quorum.
   for (const r of usable) {
-    const k = `${r.task}|${r.denominator.records}|${r.denominator.participants}|${r.denominator.corpus}`;
+    const k = `${r.task}|${r.denominator.records}|${r.denominator.participants}|${r.denominator.corpus}|${r.claim}`;
     if (!buckets.has(k)) buckets.set(k, []);
     buckets.get(k).push(r);
   }
+  // Any task+denominator that carries more than one claim kind is a DATA
+  // defect, not a quorum. It is reported, not averaged.
+  const byShape = new Map();
+  for (const r of usable) {
+    const shape = `${r.task}|${r.denominator.records}|${r.denominator.participants}|${r.denominator.corpus}`;
+    if (!byShape.has(shape)) byShape.set(shape, new Set());
+    byShape.get(shape).add(r.claim);
+  }
+  const mixedGroups = [...byShape.entries()]
+    .filter(([, kinds]) => kinds.size > 1)
+    .map(([shape, kinds]) => ({ shape, kinds: [...kinds].sort() }));
+
   const out = [];
   for (const [k, rs] of buckets) {
     const kinds = new Set(rs.map((r) => r.claim));
     out.push({
       task: rs[0].task,
-      claim: claim || [...kinds].join('+'),
+      claim: rs[0].claim,
       rows: rs.length,
+      // A bucket can no longer be mixed, because the claim is in the key.
       mixedClaimKinds: kinds.size > 1,
       denominator: rs[0].denominator,
       pass: rs.filter((r) => r.verdict === VERDICTS.PASS).length,
@@ -73,6 +100,14 @@ export function quorum(table, { claim } = {}) {
       notMeasured: rs.filter((r) => r.verdict === VERDICTS.NOT_MEASURED).length,
       comparable: rs.every((r) => comparable(r, rs[0])),
     });
+  }
+  // The mixed groups are surfaced on every bucket of the affected task, so
+  // a reader of the table cannot miss them.
+  if (mixedGroups.length) {
+    for (const b of out) {
+      const m = mixedGroups.find((g) => g.shape.startsWith(`${b.task}|`));
+      if (m) { b.mixedClaimKinds = true; b.mixedWith = m.kinds; }
+    }
   }
   return out;
 }
