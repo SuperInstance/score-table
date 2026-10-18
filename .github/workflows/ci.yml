@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
-      - run: node --test "test/*.test.mjs"
+      - run: node test/all.mjs
       - name: the table must not report a missing measurement as a pass
         run: |
           set +e
