@@ -1,0 +1,16 @@
+{
+  "gitpp.leaf.encoding": {
+    "minRecords": 1000,
+    "minParticipants": 5,
+    "tolerance": { "disagreements": 0, "errors": 0 },
+    "corpus": "gitpp-cross-port/fuzz @ generate.py 20043",
+    "declaredIn": "SuperInstance/gitpp-oracle README.md -- a declared >=1000-record floor, fixed before this run"
+  },
+  "gitpp.fold.semantics": {
+    "minRecords": 29,
+    "minParticipants": 5,
+    "tolerance": { "failures": 0 },
+    "corpus": "gitpp-fold-conformance/run.mjs @ 29 cases",
+    "declaredIn": "SuperInstance/gitpp-fold-conformance -- 29 discriminating cases, fixed before this run"
+  }
+}

@@ -1,0 +1,28 @@
+name: CI
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false          # every leg must report, not just the first
+      matrix:
+        node: ["20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --test "test/*.test.mjs"
+      - name: the table must not report a missing measurement as a pass
+        run: |
+          set +e
+          node bin/score-table.mjs --quorum
+          code=$?
+          if [ "$code" -eq 0 ]; then
+            echo "::error::the table exited 0 while a measurement is outstanding"
+            exit 1
+          fi
+          echo "table exited $code, as it should while a measurement is missing"

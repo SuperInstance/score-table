@@ -1,0 +1,22 @@
+{
+  "name": "score-table",
+  "version": "0.1.0",
+  "description": "A score table for the SuperInstance fleet: rows that declare their denominator, their pre-registered tolerance, and their receipt. PASS, FAIL, and NOT_MEASURED.",
+  "type": "module",
+  "main": "./src/score.mjs",
+  "exports": {
+    ".": "./src/score.mjs",
+    "./schema": "./src/schema.mjs",
+    "./pre-registration": "./src/pre-registration.mjs"
+  },
+  "bin": { "score-table": "./bin/score-table.mjs" },
+  "files": ["src", "bin", "data", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "table": "node bin/score-table.mjs --quorum"
+  },
+  "keywords": ["score-table", "conformance", "denominator", "quorum", "quilt"],
+  "license": "MIT",
+  "repository": { "type": "git", "url": "git+https://github.com/SuperInstance/score-table.git" },
+  "private": false
+}
